@@ -10,17 +10,9 @@ const (
 )
 
 func main() {
-	tokens := []Token{
-		SimpleToken{"id", "id"},
-		SimpleToken{"+", "+"},
-		SimpleToken{"id", "id"},
-		SimpleToken{"+", "+"},
-		SimpleToken{"id", "id"},
-		SimpleToken{"*", "*"},
-		SimpleToken{"id", "id"},
-		SimpleToken{"$", "$"},
-	}
+	tokens := SimpleInput("id", "+", "id", "+", "id", "*", "id", "$")
 	prec := OpHelper(map[TokenType]int{"+": 1, "*": 2, "id": 1000})
+	reductions := map[string]string{"id": "expr", "expr + expr": "expr", "expr * expr": "expr"}
 	var prev Token
 	prev = SimpleToken{"$", "$"}
 	for _, t := range tokens {
@@ -32,7 +24,7 @@ func main() {
 		prev = t
 	}
 	fmt.Println("Parsing!")
-	parser := OpParser{prec: prec}
+	parser := OpParser{prec: prec, productions: reductions}
 	//	parser.Next(SimpleToken{"$", "$"})
 	for _, t := range tokens {
 		err := parser.Next(t)

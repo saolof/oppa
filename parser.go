@@ -1,6 +1,7 @@
 package main
 
 import "fmt"
+import "strings"
 
 type TokenType = string
 
@@ -11,16 +12,19 @@ type Token interface {
 
 type TokenCmp int
 type TokenPrecedence func(TokenType, TokenType) (TokenCmp, error)
+type Productions = map[string]string
 
 type CSTNode struct {
 	IsTerminal bool
+	Type       TokenType
 	Terminal   Token
 	relPrev    TokenCmp
 	Children   []CSTNode
 }
 type OpParser struct {
-	stack []CSTNode
-	prec  TokenPrecedence
+	stack       []CSTNode
+	prec        TokenPrecedence
+	productions Productions
 }
 
 const (
@@ -37,7 +41,7 @@ start:
 		p.appendTerm(tok, LT)
 		return nil
 	}
-	topType := p.stack[topTerm].Terminal.TokenType()
+	topType := p.stack[topTerm].Type
 	c, err := p.prec(topType, tok.TokenType())
 	if err != nil {
 		return err
@@ -58,8 +62,13 @@ start:
 			piv = i - 1
 		}
 		l := len(p.stack)
+		var ok bool
 		node := CSTNode{}
 		node.Children = append(node.Children, p.stack[piv:l]...)
+		node.Type, ok = reduceRules(p.productions, node.Children)
+		if !ok {
+			fmt.Println("No rule matching", node.Type)
+		}
 		p.stack = p.stack[0:piv]
 		p.stack = append(p.stack, node)
 		goto start
@@ -71,6 +80,7 @@ start:
 func (p *OpParser) appendTerm(tok Token, c TokenCmp) {
 	p.stack = append(p.stack, CSTNode{
 		IsTerminal: true,
+		Type:       tok.TokenType(),
 		Terminal:   tok,
 		relPrev:    c,
 	})
@@ -94,6 +104,21 @@ func (p OpParser) topTerminalLT() int {
 	return -1
 }
 
+func reduceRules(prods Productions, childtypes []CSTNode) (TokenType, bool) {
+	var b strings.Builder
+	b.Grow(256)
+	b.WriteString(childtypes[0].Type)
+	for _, s := range childtypes[1:] {
+		b.WriteString(" ")
+		b.WriteString(s.Type)
+	}
+	out, ok := prods[b.String()]
+	if ok {
+		return TokenType(out), ok
+	}
+	return b.String(), false
+}
+
 // Utils for testing:
 
 type SimpleToken struct {
@@ -107,6 +132,13 @@ func (t SimpleToken) String() string {
 
 func (t SimpleToken) TokenType() TokenType {
 	return t.T
+}
+
+func SimpleInput(rawtokens ...string) (out []Token) {
+	for _, s := range rawtokens {
+		out = append(out, SimpleToken{Lit: s, T: s})
+	}
+	return out
 }
 
 func OpHelper(precs map[TokenType]int) TokenPrecedence {
